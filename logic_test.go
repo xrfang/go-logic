@@ -13,6 +13,15 @@ and:
 - or: [item2, item3]
 - not: [~extra]
 `
+	EXPMULTI = `
+---
+all_of:
+- item1
+- 2_of:
+  - item2
+  - item3
+  - item4
+`
 )
 
 func TestLoad(t *testing.T) {
@@ -28,7 +37,7 @@ func TestLoad(t *testing.T) {
 func TestEvalTrue(t *testing.T) {
 	x, _ := Parse(EXPRESSION)
 	if !x.Eval([]string{"item1", "item3"}) {
-		t.Log("evaluation failed.")
+		t.Log("expected true, got false.")
 		t.Fail()
 		return
 	}
@@ -38,7 +47,7 @@ func TestEvalTrue(t *testing.T) {
 func TestEvalFail1(t *testing.T) {
 	x, _ := Parse(EXPRESSION)
 	if x.Eval([]string{"item2"}) {
-		t.Log("evaluation failed.")
+		t.Log("expected false, got true.")
 		t.Fail()
 		return
 	}
@@ -48,7 +57,17 @@ func TestEvalFail1(t *testing.T) {
 func TestEvalFail2(t *testing.T) {
 	x, _ := Parse(EXPRESSION)
 	if x.Eval([]string{"item1", "item2", "extra_item"}) {
-		t.Log("evaluation failed.")
+		t.Log("expected false, got true.")
+		t.Fail()
+		return
+	}
+	t.Log("evaluation successful")
+}
+
+func TestMultiSelection(t *testing.T) {
+	x, _ := Parse(EXPMULTI)
+	if !x.Eval([]string{"item1", "item2", "item4"}) {
+		t.Log("expected false, got true.")
 		t.Fail()
 		return
 	}
@@ -64,12 +83,12 @@ and:
 - not: [~extra]`)
 	fmt.Println(ex.String())
 	//Output:
-	//and:
+	//all_of:
 	//- item1
-	//- or:
+	//- any_of:
 	//   - item2
 	//   - item3
-	//- not:
+	//- none_of:
 	//   - ~extra
 }
 func ExampleExpression_Eval() {
