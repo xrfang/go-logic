@@ -2,7 +2,10 @@ package logic
 
 import (
 	"fmt"
+	"os"
 	"testing"
+
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -32,6 +35,22 @@ func TestLoad(t *testing.T) {
 		return
 	}
 	t.Log("Parse() successful")
+}
+
+func TestUnmarshal(t *testing.T) {
+	var x Expression
+	err := yaml.Unmarshal([]byte(EXPRESSION), &x)
+	if err != nil {
+		t.Logf("Unmarshal failed: %v", err)
+		t.Fail()
+		return
+	}
+	if !x.Eval([]string{"item1", "item2"}) {
+		t.Log("expected true, got false")
+		t.Fail()
+		return
+	}
+	t.Log("Unmarshaled successfully")
 }
 
 func TestEvalTrue(t *testing.T) {
@@ -103,4 +122,20 @@ and:
 	}
 	fmt.Println(ex.Eval([]string{"item2", "item3", "extra_item"}))
 	//Output: false
+}
+
+func ExampleExpression() {
+	ex, _ := Parse(`---
+and:
+- item1
+- or: [item2, item3]
+- not: [~extra]`)
+	yaml.NewEncoder(os.Stdout).Encode(ex)
+	//Output: all_of:
+	//- item1
+	//- any_of:
+	//   - item2
+	//   - item3
+	//- none_of:
+	//   - ~extra
 }

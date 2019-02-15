@@ -30,6 +30,23 @@ type Expression struct {
 	subj []interface{}
 }
 
+//UnmarshalYAML implements the yaml unmarshal interface
+func (x *Expression) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var ms map[interface{}]interface{}
+	err := unmarshal(&ms)
+	if err != nil {
+		return err
+	}
+	p, err := load(ms)
+	*x = *p
+	return err
+}
+
+//MarshalYAML implements the yaml marshal interface
+func (x Expression) MarshalYAML() (interface{}, error) {
+	return x.export(), nil
+}
+
 func (x Expression) export() map[string]interface{} {
 	var subj []interface{}
 	for _, s := range x.subj {
