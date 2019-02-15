@@ -1,4 +1,4 @@
-package yamlogic
+package logic
 
 import (
 	"fmt"

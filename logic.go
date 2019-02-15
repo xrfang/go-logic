@@ -1,6 +1,6 @@
-//Package yamlogic provides primitives for boolean evaluation which checks if a
+//Package logic provides primitives for boolean evaluation which checks if a
 //specific token (string) exists (or not) in the given feature set (string slice).
-package yamlogic
+package logic
 
 import (
 	"bytes"
