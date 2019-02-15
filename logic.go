@@ -7,19 +7,26 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
-//Expression represents a logic operation, which must be one of "not", "and", "or".
-//The operands of a logic operation must be a slice whose elements could be either
-//a feature (string) or a (sub)Expression.
+//Expression represents a logic operation, which can be: "all_of" ("and"), "any_of" ("or"),
+//"none_of" ("not") or "n of", where n is a non-negative integer. If n equals 0, it is same
+//as "none_of"; if n is 1, same as "any_of" or "or"; if n equal to the number of items,
+//means "all_of", or "and"; if n is larger than the number of items, the expression will
+//always evaluate to false.
 //
-//If a feature string starts with tilde (~), its a regular expression, otherwise,
-//a raw string (which is case sensitive).
+//The operands of a logic operation must be a slice whose elements could be either a
+//feature (string) or a (sub)Expression.
+//
+//If a feature string starts with tilde (~), its a regular expression, otherwise, a raw
+//string (which is case sensitive).
 type Expression struct {
 	verb string
+	rate int
 	subj []interface{}
 }
 
@@ -59,14 +66,33 @@ func load(ms map[interface{}]interface{}) (*Expression, error) {
 		return nil, fmt.Errorf("expect 1 verb, got %d", len(ms))
 	}
 	var v string
+	var r int
 	var s []interface{}
 	for verb, subj := range ms {
-		switch verb {
-		case "not", "and", "or":
-		default:
-			return nil, fmt.Errorf("invalid verb: %v", verb)
-		}
 		v = verb.(string)
+		switch v {
+		case "not", "none_of":
+			v = "none_of"
+			r = 0
+		case "and", "all_of":
+			v = "all_of"
+			r = -1
+		case "or", "any_of":
+			v = "any_of"
+			r = 1
+		default:
+			if strings.HasSuffix(v, "_of") {
+				c, err := strconv.Atoi(v[:len(v)-3])
+				if err == nil && c >= 0 {
+					if c == 0 {
+						v = "none_of"
+					}
+					r = c
+					break
+				}
+			}
+			return nil, fmt.Errorf("invalid verb: %v", v)
+		}
 		js, ok := subj.([]interface{})
 		if !ok {
 			return nil, fmt.Errorf("subject must be slice")
@@ -86,21 +112,23 @@ func load(ms map[interface{}]interface{}) (*Expression, error) {
 			}
 		}
 	}
-	return &Expression{verb: v, subj: s}, nil
+	return &Expression{verb: v, rate: r, subj: s}, nil
 }
 
 //Load read YAML string and parse it as logic expression. If reading from
 //the reader fails, or the data is not valid, an error is returned, along
 //with nil expression.  Valid YAML is a one-element map whose key must be
-//"not", "and", "or", and value must be a slice of either string or nested
-//expression.   For example:
+//one of the defined logic operators: "all_of" ("and"), "any_of" ("or"),
+//"none_of" ("not"), or "n_of" (where n is a non-negative integer); and
+//value must be a slice of either string or nested expression. For example:
 //
 //    ---
 //    and:
 //    - item1
 //    - or: [item2, item3]
 //
-//The above YAML defines "item1 and (item2 or item3)".
+//The above YAML defines "item1 and (item2 or item3)".  For more examples,
+//see the test file.
 func Load(r io.Reader) (*Expression, error) {
 	var ms map[interface{}]interface{}
 	err := yaml.NewDecoder(r).Decode(&ms)
@@ -133,7 +161,7 @@ func eval(token string, featrues []string) bool {
 	return false
 }
 
-func (x Expression) evalNot(subj []interface{}, features []string) bool {
+func (x Expression) evalNeg(subj []interface{}, features []string) bool {
 	for _, s := range subj {
 		var res bool
 		switch s.(type) {
@@ -149,23 +177,12 @@ func (x Expression) evalNot(subj []interface{}, features []string) bool {
 	return true
 }
 
-func (x Expression) evalAnd(subj []interface{}, features []string) bool {
-	for _, s := range subj {
-		var res bool
-		switch s.(type) {
-		case string:
-			res = eval(s.(string), features)
-		default:
-			res = s.(*Expression).Eval(features)
-		}
-		if !res {
-			return false
-		}
+func (x Expression) evalPos(subj []interface{}, features []string) bool {
+	rate := x.rate
+	if rate < 0 {
+		rate = len(subj)
 	}
-	return true
-}
-
-func (x Expression) evalOr(subj []interface{}, features []string) bool {
+	hit := 0
 	for _, s := range subj {
 		var res bool
 		switch s.(type) {
@@ -175,6 +192,9 @@ func (x Expression) evalOr(subj []interface{}, features []string) bool {
 			res = s.(*Expression).Eval(features)
 		}
 		if res {
+			hit++
+		}
+		if hit >= rate {
 			return true
 		}
 	}
@@ -184,11 +204,9 @@ func (x Expression) evalOr(subj []interface{}, features []string) bool {
 //Eval evaluate the given feature set against the logic expression.
 func (x Expression) Eval(features []string) bool {
 	switch x.verb {
-	case "not":
-		return x.evalNot(x.subj, features)
-	case "and":
-		return x.evalAnd(x.subj, features)
+	case "none_of":
+		return x.evalNeg(x.subj, features)
 	default:
-		return x.evalOr(x.subj, features)
+		return x.evalPos(x.subj, features)
 	}
 }
