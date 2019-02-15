@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 )
 
 //Expression represents a logic operation, which can be: "all_of" ("and"), "any_of" ("or"),
