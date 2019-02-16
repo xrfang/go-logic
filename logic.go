@@ -13,17 +13,18 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-//Expression represents a logic operation, which can be: "all_of" ("and"), "any_of" ("or"),
-//"none_of" ("not") or "n of", where n is a non-negative integer. If n equals 0, it is same
-//as "none_of"; if n is 1, same as "any_of" or "or"; if n equal to the number of items,
-//means "all_of", or "and"; if n is larger than the number of items, the expression will
-//always evaluate to false.
+//Expression represents a logic operation, which can be: "all_of" ("and"), "any_of"
+//("or"), "none_of" ("not"), "n of" (where n is a non-negative integer), "always"
+//("true"), or "never" ("false"). If n equals 0, it is same as "none_of"; if n is
+//1, same as "any_of"; if n equal to the number of items, means "all_of"; if n is
+//larger than the number of items, the expression will be same as "never", which
+//yields false for any input. On the contrary, "always" will always return true.
 //
-//The operands of a logic operation must be a slice whose elements could be either a
-//feature (string) or a (sub)Expression.
+//The operands of a logic operation must be a slice whose elements could be either
+//a feature (string) or a (sub)Expression.
 //
-//If a feature string starts with tilde (~), its a regular expression, otherwise, a raw
-//string (which is case sensitive).
+//If a feature string starts with tilde (~), its a regular expression, otherwise,
+//a raw string (which is case sensitive).
 type Expression struct {
 	verb string
 	rate int
@@ -97,6 +98,10 @@ func load(ms map[interface{}]interface{}) (*Expression, error) {
 		case "or", "any_of":
 			v = "any_of"
 			r = 1
+		case "always", "true":
+			return &Expression{verb: "always"}, nil
+		case "never", "false":
+			return &Expression{verb: "never"}, nil
 		default:
 			if strings.HasSuffix(v, "_of") {
 				c, err := strconv.Atoi(v[:len(v)-3])
@@ -221,6 +226,10 @@ func (x Expression) evalPos(subj []interface{}, features []string) bool {
 //Eval evaluate the given feature set against the logic expression.
 func (x Expression) Eval(features []string) bool {
 	switch x.verb {
+	case "always":
+		return true
+	case "never":
+		return false
 	case "none_of":
 		return x.evalNeg(x.subj, features)
 	default:

@@ -53,6 +53,28 @@ func TestUnmarshal(t *testing.T) {
 	t.Log("Unmarshaled successfully")
 }
 
+func TestTrue(t *testing.T) {
+	x, _ := Parse(`---
+always:`)
+	if !x.Eval([]string{"any", "feature"}) {
+		t.Log("expected true, got false")
+		t.Fail()
+		return
+	}
+	t.Log("Always true passed")
+}
+
+func TestFalse(t *testing.T) {
+	x, _ := Parse(`---
+never:`)
+	if x.Eval([]string{"any", "feature"}) {
+		t.Log("expected false, got true")
+		t.Fail()
+		return
+	}
+	t.Log("Always false passed")
+}
+
 func TestEvalTrue(t *testing.T) {
 	x, _ := Parse(EXPRESSION)
 	if !x.Eval([]string{"item1", "item3"}) {
